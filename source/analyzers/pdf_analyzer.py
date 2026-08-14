@@ -10,12 +10,34 @@ def extract_urls(reader: PdfReader) -> list[str]:
     url_pattern = re.compile(r"https?://[^\s<>\"]+")
 
     for page in reader.pages:
+        # Check URLs contained in visible PDF text
         text = page.extract_text() or ""
 
         matches = url_pattern.findall(text)
 
         for url in matches:
             urls.add(url.rstrip(".,;:!?"))
+
+        # Check clickable link annotations
+        annotations = page.get("/Annots")
+
+        if not annotations:
+            continue
+
+        for annotation_ref in annotations:
+            annotation = annotation_ref.get_object()
+
+            action = annotation.get("/A")
+
+            if not action:
+                continue
+
+            action = action.get_object()
+
+            uri = action.get("/URI")
+
+            if uri:
+                urls.add(str(uri))
 
     return sorted(urls)
 
