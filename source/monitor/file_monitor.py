@@ -2,11 +2,14 @@ from pathlib import Path
 
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
+
 from source.identification.file_identifier import identify_file
+from source.processor import process_file
 
 import time # Timer to prevent CPU Consumption
 
 class DownloadEventHandler(FileSystemEventHandler):
+
     def on_created(self, event):
         if event.is_directory:
             return
@@ -15,6 +18,7 @@ class DownloadEventHandler(FileSystemEventHandler):
 
         print(f"[DETECTED] New file: {file_path.name}")
 
+        # Step 1: Identify the file
         try:
             file_info = identify_file(str(file_path))
 
@@ -27,17 +31,31 @@ class DownloadEventHandler(FileSystemEventHandler):
         except Exception as error:
             print(f"[ERROR] Could not identify file: {error}")
 
+        # Step 2: Analyze the file and calculate risk
+        try:
+            process_file(str(file_path))
+
+        except Exception as error:
+            print(f"[ERROR] Could not analyze file: {error}")
+
 
 def monitor_directory(directory: str):
     path = Path(directory)
 
     if not path.exists():
-        raise FileNotFoundError(f"Directory does not exist: {path}")
+        raise FileNotFoundError(
+            f"Directory does not exist: {path}"
+        )
 
     event_handler = DownloadEventHandler()
     observer = Observer()
 
-    observer.schedule(event_handler, str(path), recursive=False)
+    observer.schedule(
+        event_handler,
+        str(path),
+        recursive=False
+    )
+
     observer.start()
 
     print(f"Monitoring: {path}")
@@ -46,7 +64,9 @@ def monitor_directory(directory: str):
     try:
         while True:
             time.sleep(1)
+
     except KeyboardInterrupt:
+        print("\nStopping Download Security Agent...")
         observer.stop()
 
     observer.join()
