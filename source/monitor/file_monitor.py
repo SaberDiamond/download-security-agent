@@ -26,7 +26,6 @@ class DownloadEventHandler(FileSystemEventHandler):
 
         print(f"[DETECTED] New file: {file_path.name}")
 
-        # Do not analyze the file here.
         # Simply place it into the queue.
         self.file_queue.put(file_path)
 
@@ -87,16 +86,10 @@ def monitor_directory(directory: str):
             f"Directory does not exist: {path}"
         )
 
-    # ---------------------------------------------------------
     # Create the processing queue
-    # ---------------------------------------------------------
-
     file_queue = Queue()
 
-    # ---------------------------------------------------------
     # Start the worker thread
-    # ---------------------------------------------------------
-
     worker = Thread(
         target=process_queue,
         args=(file_queue,),
@@ -105,10 +98,7 @@ def monitor_directory(directory: str):
 
     worker.start()
 
-    # ---------------------------------------------------------
     # Start the filesystem event observer
-    # ---------------------------------------------------------
-
     event_handler = DownloadEventHandler(file_queue)
     observer = Observer()
 
@@ -125,7 +115,6 @@ def monitor_directory(directory: str):
     print("Waiting for files...\n")
 
     try:
-        # Keep the main program alive while the observer runs.
         # The observer itself is event-driven.
         observer.join()
 
