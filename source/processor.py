@@ -37,6 +37,31 @@ def process_file(file_path: str) -> None:
     print(f"Pages: {analysis['pages']}")
     print(f"JavaScript: {analysis['javascript_detected']}")
     print(f"URLs: {analysis['urls']}")
+
+    print("URL Analysis:")
+
+    for url_result in analysis["url_analysis"]:
+        print()
+        print(f"  URL: {url_result.get('url')}")
+        print(f"  Domain: {url_result.get('domain')}")
+        print(f"  IP Addresses: {url_result.get('ip_addresses')}")
+
+        whois = url_result.get("whois", {})
+
+        print("  WHOIS:")
+        print(f"    Registrar: {whois.get('registrar')}")
+        print(f"    Creation Date: {whois.get('creation_date')}")
+        print(f"    Expiration Date: {whois.get('expiration_date')}")
+        print(f"    Domain Age: {whois.get('domain_age_days')} days")
+
+        dnsbl = url_result.get("dnsbl", [])
+
+        print("  DNSBL:")
+
+        for result in dnsbl:
+            print(f"    IP: {result.get('ip')}")
+            print(f"    Status: {result.get('status')}")
+    
     print(f"Embedded Files: {analysis['embedded_files_detected']}")
     print(f"Actions: {analysis['actions_detected']}")
 
