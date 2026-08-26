@@ -5,6 +5,7 @@ from pypdf import PdfReader
 
 from source.analyzers.url_analyzer import analyze_urls
 from source.assessment.url_assessment import assess_urls
+from source.analyzers.javascript_analyzer import analyze_embedded_javascript
 
 
 # Function to extract URLs from PDF text
@@ -102,6 +103,9 @@ def analyze_pdf(file_path: str) -> dict:
     if javascript_detected:
         findings.append("JavaScript detected")
 
+    # Embedded JavaScript analysis
+    javascript_analysis = analyze_embedded_javascript(file_path)
+
     # URL detection
     urls = extract_urls(reader)
 
@@ -130,11 +134,16 @@ def analyze_pdf(file_path: str) -> dict:
     return {
         "pages": len(reader.pages),
         "encrypted": reader.is_encrypted,
+
         "javascript_detected": javascript_detected,
+        "javascript_analysis": javascript_analysis,
+
         "urls": urls,
         "url_analysis": url_analysis,
         "url_assessment": url_assessment,
+
         "embedded_files_detected": embedded_files_detected,
         "actions_detected": actions_detected,
+
         "findings": findings,
     }
