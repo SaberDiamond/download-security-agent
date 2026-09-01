@@ -46,7 +46,6 @@ def assess_expiration(expiration_date) -> dict:
 
     now = datetime.now(timezone.utc)
 
-    # Handle datetime objects without timezone information.
     if expiration_date.tzinfo is None:
         expiration_date = expiration_date.replace(
             tzinfo=timezone.utc
@@ -95,16 +94,37 @@ def assess_dnsbl(dnsbl_results: list[dict]) -> dict:
         if result.get("listed") is True
     ]
 
+    lookup_errors = [
+        result
+        for result in dnsbl_results
+        if result.get("listed") is None
+    ]
+
     if listed_ips:
         return {
             "status": "concerning",
-            "reason": "One or more resolved IP addresses are listed by DNSBL.",
+            "reason": (
+                "One or more resolved IP addresses "
+                "are listed by DNSBL."
+            ),
             "listed_ips": listed_ips,
+        }
+
+    if lookup_errors:
+        return {
+            "status": "unknown",
+            "reason": (
+                "DNSBL checks could not be completed "
+                "for all resolved IP addresses."
+            ),
+            "listed_ips": [],
         }
 
     return {
         "status": "not_listed",
-        "reason": "Resolved IP addresses were not listed by DNSBL.",
+        "reason": (
+            "Resolved IP addresses were not listed by DNSBL."
+        ),
         "listed_ips": [],
     }
 
@@ -129,43 +149,79 @@ def assess_https(scheme: str) -> dict:
     }
 
 
+def determine_verdict(
+    dnsbl_result: dict,
+    domain_age_result: dict,
+    expiration_result: dict,
+    https_result: dict,
+) -> str:
+    """
+    Determine an overall reputation verdict.
+
+    The verdict is based only on the available reputation
+    indicators. It does not claim that a URL is definitively
+    malicious or safe.
+    """
+
+    if dnsbl_result["status"] == "concerning":
+        return "SUSPICIOUS"
+
+    if (
+        domain_age_result["status"] == "concerning"
+        or expiration_result["status"] == "concerning"
+    ):
+        return "SUSPICIOUS"
+
+    if (
+        dnsbl_result["status"] == "unknown"
+        or domain_age_result["status"] == "unknown"
+        or expiration_result["status"] == "unknown"
+    ):
+        return "UNKNOWN"
+
+    if (
+        domain_age_result["status"] == "caution"
+        or expiration_result["status"] == "caution"
+        or https_result["status"] == "caution"
+    ):
+        return "CAUTION"
+
+    return "LOW_RISK"
+
+
 def assess_url(url_analysis: dict) -> dict:
     """
-    Perform an overall assessment of a single analyzed URL.
+    Perform an overall reputation assessment of a URL.
 
-    This function does not declare a URL malicious.
-    It summarizes security-relevant indicators and provides
-    an overall assessment based on the available evidence.
+    The assessment summarizes WHOIS, DNSBL, domain age,
+    expiration, and HTTPS indicators.
+
+    It does not declare a URL definitively safe or malicious.
     """
 
-    findings = []
-
+    url = url_analysis.get("url")
     domain = url_analysis.get("domain")
     scheme = url_analysis.get("scheme")
     whois = url_analysis.get("whois")
     dnsbl = url_analysis.get("dnsbl", [])
 
-    # If URL analysis itself failed.
+    findings = []
+
+    # Handle URL analysis failure.
     if url_analysis.get("error"):
         return {
-            "url": url_analysis.get("url"),
+            "url": url,
             "domain": domain,
+            "verdict": "UNKNOWN",
             "assessment": "unknown",
             "findings": [
                 f"URL analysis failed: {url_analysis['error']}"
             ],
         }
 
-    # WHOIS and domain age assessment.
-    domain_age_result = {
-        "status": "unknown",
-        "reason": "Domain age could not be determined.",
-    }
-
-    expiration_result = {
-        "status": "unknown",
-        "reason": "Domain expiration date could not be determined.",
-    }
+    # -----------------------------
+    # WHOIS
+    # -----------------------------
 
     if whois:
         domain_age_result = assess_domain_age(
@@ -175,83 +231,81 @@ def assess_url(url_analysis: dict) -> dict:
         expiration_result = assess_expiration(
             whois.get("expiration_date")
         )
-
-        if domain_age_result["status"] in {
-            "concerning",
-            "caution",
-        }:
-            findings.append(domain_age_result["reason"])
-
-        if expiration_result["status"] in {
-            "concerning",
-            "caution",
-        }:
-            findings.append(expiration_result["reason"])
-
     else:
-        findings.append(
-            "WHOIS information could not be determined."
-        )
+        domain_age_result = {
+            "status": "unknown",
+            "reason": "Domain age could not be determined.",
+        }
 
-    # DNSBL assessment.
+        expiration_result = {
+            "status": "unknown",
+            "reason": "Domain expiration date could not be determined.",
+        }
+
+    # Add relevant WHOIS findings.
+    if domain_age_result["status"] in {
+        "concerning",
+        "caution",
+    }:
+        findings.append(domain_age_result["reason"])
+
+    if expiration_result["status"] in {
+        "concerning",
+        "caution",
+    }:
+        findings.append(expiration_result["reason"])
+
+    # -----------------------------
+    # DNSBL
+    # -----------------------------
+
     dnsbl_result = assess_dnsbl(dnsbl)
 
     if dnsbl_result["status"] == "concerning":
         findings.append(dnsbl_result["reason"])
 
-    # HTTPS assessment.
+    elif dnsbl_result["status"] == "unknown":
+        findings.append(dnsbl_result["reason"])
+
+    # -----------------------------
+    # HTTPS
+    # -----------------------------
+
     https_result = assess_https(scheme or "")
 
     if https_result["status"] == "caution":
         findings.append(https_result["reason"])
 
-    # Determine overall assessment.
-    dnsbl_concerning = dnsbl_result["status"] == "concerning"
+    # -----------------------------
+    # Overall verdict
+    # -----------------------------
 
-    domain_age_concerning = (
-        domain_age_result["status"] == "concerning"
+    verdict = determine_verdict(
+        dnsbl_result,
+        domain_age_result,
+        expiration_result,
+        https_result,
     )
 
-    expiration_concerning = (
-        expiration_result["status"] == "concerning"
-    )
-
-    dnsbl_unknown = dnsbl_result["status"] == "unknown"
-
-    domain_age_caution = (
-        domain_age_result["status"] == "caution"
-    )
-
-    expiration_caution = (
-        expiration_result["status"] == "caution"
-    )
-
-    https_caution = (
-        https_result["status"] == "caution"
-    )
-
-    if dnsbl_concerning:
-        assessment = "concerning"
-
-    elif domain_age_concerning or expiration_concerning:
-        assessment = "suspicious"
-
-    elif (
-        dnsbl_unknown
-        or domain_age_caution
-        or expiration_caution
-        or https_caution
-    ):
-        assessment = "caution"
-
-    else:
-        assessment = "no_obvious_concerns"
+    # Keep the existing assessment field for compatibility
+    # with the rest of the project.
+    assessment_map = {
+        "LOW_RISK": "no_obvious_concerns",
+        "CAUTION": "caution",
+        "SUSPICIOUS": "suspicious",
+        "UNKNOWN": "unknown",
+    }
 
     return {
-        "url": url_analysis.get("url"),
+        "url": url,
         "domain": domain,
-        "assessment": assessment,
+        "verdict": verdict,
+        "assessment": assessment_map[verdict],
         "findings": findings,
+        "domain_age": domain_age_result,
+        "expiration": expiration_result,
+        "dnsbl": dnsbl_result,
+        "https": https_result,
     }
 
 
