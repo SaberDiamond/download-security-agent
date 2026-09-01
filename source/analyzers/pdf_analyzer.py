@@ -9,15 +9,12 @@ from source.analyzers.javascript_analyzer import analyze_embedded_javascript
 from source.analyzers.embedded_file_analyzer import extract_embedded_files
 
 
-# Function to extract URLs from PDF text
+# Extract URLs from PDF text and clickable link annotations
 def extract_urls(reader: PdfReader) -> list[str]:
-
     urls = set()
-
-    url_pattern = re.compile(r"https?://[^\s<>\"']+")
+    url_pattern = re.compile(r"https?://[^\s<>\"]+")
 
     for page in reader.pages:
-
         # Check URLs contained in visible PDF text
         text = page.extract_text() or ""
 
@@ -33,7 +30,6 @@ def extract_urls(reader: PdfReader) -> list[str]:
             continue
 
         for annotation_ref in annotations:
-
             annotation = annotation_ref.get_object()
 
             action = annotation.get("/A")
@@ -51,9 +47,8 @@ def extract_urls(reader: PdfReader) -> list[str]:
     return sorted(urls)
 
 
-# Function to detect embedded files in PDF
+# Detect embedded files in PDF
 def detect_embedded_files(reader: PdfReader) -> bool:
-
     root = reader.root_object
 
     names = root.get("/Names")
@@ -68,9 +63,8 @@ def detect_embedded_files(reader: PdfReader) -> bool:
     return embedded_files is not None
 
 
-# Function to detect OpenAction or AA in PDF
+# Detect OpenAction or additional PDF actions
 def detect_pdf_actions(reader: PdfReader) -> bool:
-
     root = reader.root_object
 
     if root.get("/OpenAction"):
@@ -82,11 +76,9 @@ def detect_pdf_actions(reader: PdfReader) -> bool:
     return False
 
 
-# Function to analyze PDF
+# Analyze PDF
 def analyze_pdf(file_path: str) -> dict:
-
     path = Path(file_path)
-
     reader = PdfReader(path)
 
     findings = []
@@ -95,25 +87,12 @@ def analyze_pdf(file_path: str) -> dict:
     if reader.is_encrypted:
         findings.append("PDF is encrypted")
 
-    # JavaScript detection
-    javascript_detected = False
-
-    root = reader.root_object
-
-    names = root.get("/Names")
-
-    if names:
-
-        names = names.get_object()
-
-        if names.get("/JavaScript"):
-            javascript_detected = True
+    # JavaScript analysis
+    javascript_analysis = analyze_embedded_javascript(file_path)
+    javascript_detected = bool(javascript_analysis)
 
     if javascript_detected:
         findings.append("JavaScript detected")
-
-    # Embedded JavaScript analysis
-    javascript_analysis = analyze_embedded_javascript(file_path)
 
     # URL detection
     urls = extract_urls(reader)
@@ -130,14 +109,12 @@ def analyze_pdf(file_path: str) -> dict:
     # Embedded file detection
     embedded_files_detected = detect_embedded_files(reader)
 
-    # Embedded file analysis
     embedded_file_analysis = []
 
     if embedded_files_detected:
-
         embedded_file_analysis = extract_embedded_files(
             file_path,
-            "samples/extracted"
+            str(path.parent / "extracted")
         )
 
         findings.append("Embedded file(s) detected")
@@ -152,18 +129,13 @@ def analyze_pdf(file_path: str) -> dict:
     return {
         "pages": len(reader.pages),
         "encrypted": reader.is_encrypted,
-
         "javascript_detected": javascript_detected,
         "javascript_analysis": javascript_analysis,
-
         "urls": urls,
         "url_analysis": url_analysis,
         "url_assessment": url_assessment,
-
         "embedded_files_detected": embedded_files_detected,
         "embedded_file_analysis": embedded_file_analysis,
-
         "actions_detected": actions_detected,
-
         "findings": findings,
     }

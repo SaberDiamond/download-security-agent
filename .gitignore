@@ -1,6 +1,10 @@
 .venv/
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 .DS_Store
 .env
+.env.*
 samples/extracted/
+samples/test_downloads/extracted/
+*.tmp

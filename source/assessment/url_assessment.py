@@ -5,7 +5,8 @@ def assess_domain_age(domain_age_days: int | None) -> dict:
     """
     Assess the age of a domain.
 
-    Domain age is only an indicator. A new domain is not automatically malicious.
+    Domain age is only an indicator.
+    A new domain is not automatically malicious.
     """
 
     if domain_age_days is None:
@@ -45,9 +46,11 @@ def assess_expiration(expiration_date) -> dict:
 
     now = datetime.now(timezone.utc)
 
-    # Handle datetime objects that do not contain timezone information.
+    # Handle datetime objects without timezone information.
     if expiration_date.tzinfo is None:
-        expiration_date = expiration_date.replace(tzinfo=timezone.utc)
+        expiration_date = expiration_date.replace(
+            tzinfo=timezone.utc
+        )
 
     days_until_expiration = (expiration_date - now).days
 
@@ -110,8 +113,8 @@ def assess_https(scheme: str) -> dict:
     """
     Assess whether HTTPS is being used.
 
-    HTTPS provides encrypted transport but does not establish that
-    a website itself is trustworthy.
+    HTTPS provides encrypted transport but does not establish
+    that a website itself is trustworthy.
     """
 
     if scheme.lower() == "https":
@@ -130,7 +133,7 @@ def assess_url(url_analysis: dict) -> dict:
     """
     Perform an overall assessment of a single analyzed URL.
 
-    This function does NOT declare a URL malicious.
+    This function does not declare a URL malicious.
     It summarizes security-relevant indicators and provides
     an overall assessment based on the available evidence.
     """
@@ -146,48 +149,57 @@ def assess_url(url_analysis: dict) -> dict:
     if url_analysis.get("error"):
         return {
             "url": url_analysis.get("url"),
+            "domain": domain,
             "assessment": "unknown",
             "findings": [
                 f"URL analysis failed: {url_analysis['error']}"
             ],
         }
 
-    # Domain age
+    # WHOIS and domain age assessment.
+    domain_age_result = {
+        "status": "unknown",
+        "reason": "Domain age could not be determined.",
+    }
+
+    expiration_result = {
+        "status": "unknown",
+        "reason": "Domain expiration date could not be determined.",
+    }
+
     if whois:
         domain_age_result = assess_domain_age(
             whois.get("domain_age_days")
         )
 
-        if domain_age_result["status"] == "concerning":
+        expiration_result = assess_expiration(
+            whois.get("expiration_date")
+        )
+
+        if domain_age_result["status"] in {
+            "concerning",
+            "caution",
+        }:
             findings.append(domain_age_result["reason"])
 
-        elif domain_age_result["status"] == "caution":
-            findings.append(domain_age_result["reason"])
+        if expiration_result["status"] in {
+            "concerning",
+            "caution",
+        }:
+            findings.append(expiration_result["reason"])
 
     else:
         findings.append(
             "WHOIS information could not be determined."
         )
 
-    # Expiration
-    if whois:
-        expiration_result = assess_expiration(
-            whois.get("expiration_date")
-        )
-
-        if expiration_result["status"] == "concerning":
-            findings.append(expiration_result["reason"])
-
-        elif expiration_result["status"] == "caution":
-            findings.append(expiration_result["reason"])
-
-    # DNSBL
+    # DNSBL assessment.
     dnsbl_result = assess_dnsbl(dnsbl)
 
     if dnsbl_result["status"] == "concerning":
         findings.append(dnsbl_result["reason"])
 
-    # HTTPS
+    # HTTPS assessment.
     https_result = assess_https(scheme or "")
 
     if https_result["status"] == "caution":
@@ -197,36 +209,26 @@ def assess_url(url_analysis: dict) -> dict:
     dnsbl_concerning = dnsbl_result["status"] == "concerning"
 
     domain_age_concerning = (
-        whois is not None
-        and assess_domain_age(
-            whois.get("domain_age_days")
-        )["status"] == "concerning"
+        domain_age_result["status"] == "concerning"
     )
 
     expiration_concerning = (
-        whois is not None
-        and assess_expiration(
-            whois.get("expiration_date")
-        )["status"] == "concerning"
+        expiration_result["status"] == "concerning"
     )
 
-    dnsbl_caution = dnsbl_result["status"] == "unknown"
+    dnsbl_unknown = dnsbl_result["status"] == "unknown"
 
     domain_age_caution = (
-        whois is not None
-        and assess_domain_age(
-            whois.get("domain_age_days")
-        )["status"] == "caution"
+        domain_age_result["status"] == "caution"
     )
 
     expiration_caution = (
-        whois is not None
-        and assess_expiration(
-            whois.get("expiration_date")
-        )["status"] == "caution"
+        expiration_result["status"] == "caution"
     )
 
-    https_caution = https_result["status"] == "caution"
+    https_caution = (
+        https_result["status"] == "caution"
+    )
 
     if dnsbl_concerning:
         assessment = "concerning"
@@ -235,7 +237,7 @@ def assess_url(url_analysis: dict) -> dict:
         assessment = "suspicious"
 
     elif (
-        dnsbl_caution
+        dnsbl_unknown
         or domain_age_caution
         or expiration_caution
         or https_caution

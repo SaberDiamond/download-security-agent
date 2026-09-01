@@ -8,7 +8,20 @@ def check_dnsbl(ip_address: str) -> dict:
 
     The Spamhaus DQS key is read from the
     SPAMHAUS_DQS_KEY environment variable.
+
+    Returns:
+    - listed=True if the IP is listed
+    - listed=False if the IP is not listed
+    - listed=None if the lookup could not be performed
     """
+
+    # This POC currently supports IPv4 DNSBL lookups.
+    if ":" in ip_address:
+        return {
+            "ip": ip_address,
+            "listed": None,
+            "status": "IPv6 not supported",
+        }
 
     dqs_key = os.getenv("SPAMHAUS_DQS_KEY")
 

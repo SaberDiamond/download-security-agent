@@ -7,7 +7,7 @@ from source.analyzers.dnsbl_analyzer import check_dnsbl
 
 def normalize_url(url: str) -> str:
     """
-    Normalize a URL.
+    Normalize a URL by ensuring it has an HTTP or HTTPS scheme.
     """
 
     url = str(url).strip()
@@ -30,7 +30,7 @@ def resolve_domain(domain: str | None) -> list[str]:
         results = socket.getaddrinfo(
             domain,
             None,
-            type=socket.SOCK_STREAM
+            type=socket.SOCK_STREAM,
         )
 
         ip_addresses = set()
@@ -49,17 +49,20 @@ def resolve_domain(domain: str | None) -> list[str]:
 
 def analyze_url(url: str) -> dict:
     """
-    Perform URL analysis including:
+    Analyze a single URL.
 
-    - URL normalization
-    - Domain extraction
-    - DNS resolution
-    - WHOIS analysis
-    - DNSBL reputation analysis
+    Collects:
+    - normalized URL information
+    - domain information
+    - resolved IP addresses
+    - WHOIS information
+    - DNSBL reputation information
+
+    This function collects evidence. It does not determine
+    whether the URL is safe or malicious.
     """
 
     normalized_url = normalize_url(url)
-
     parsed = urlparse(normalized_url)
 
     domain = parsed.hostname
@@ -73,16 +76,13 @@ def analyze_url(url: str) -> dict:
     else:
         whois_analysis = {
             "domain": None,
-            "error": "Could not extract domain"
+            "error": "Could not extract domain",
         }
 
-    # DNSBL analysis for each resolved IP.
+    # DNSBL analysis for each resolved IPv4 address.
     dnsbl_analysis = []
 
     for ip_address in ip_addresses:
-
-        # Spamhaus DNSBL currently operates on IPv4 addresses
-        # for this component of the POC.
         if ":" in ip_address:
             continue
 
@@ -106,6 +106,9 @@ def analyze_url(url: str) -> dict:
 def analyze_urls(urls: list[str]) -> list[dict]:
     """
     Analyze multiple URLs.
+
+    Individual URL failures are captured so that one
+    problematic URL does not stop analysis of the others.
     """
 
     results = []
@@ -115,9 +118,11 @@ def analyze_urls(urls: list[str]) -> list[dict]:
             results.append(analyze_url(url))
 
         except Exception as error:
-            results.append({
-                "url": str(url),
-                "error": str(error),
-            })
+            results.append(
+                {
+                    "url": str(url),
+                    "error": str(error),
+                }
+            )
 
     return results

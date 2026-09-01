@@ -4,6 +4,18 @@ from pathlib import Path
 from pypdf import PdfReader
 
 
+# Suspicious JavaScript patterns
+SUSPICIOUS_PATTERNS = {
+    "eval": r"\beval\s*\(",
+    "function_constructor": r"\bFunction\s*\(",
+    "unescape": r"\bunescape\s*\(",
+    "decode_uri": r"\bdecodeURI(?:Component)?\s*\(",
+    "shell_execution": r"\b(?:app\.exec|util\.shell|shell)\b",
+    "document_write": r"\bdocument\.write\s*\(",
+    "external_url": r"https?://",
+}
+
+
 def extract_javascript(file_path: str) -> list[dict]:
     """
     Extract embedded JavaScript from a PDF without executing it.
@@ -15,7 +27,6 @@ def extract_javascript(file_path: str) -> list[dict]:
     javascript = []
 
     root = reader.root_object
-
     names = root.get("/Names")
 
     if not names:
@@ -41,12 +52,10 @@ def extract_javascript(file_path: str) -> list[dict]:
     # [name, object, name, object, ...]
 
     for index in range(0, len(js_names), 2):
-
         if index + 1 >= len(js_names):
             break
 
         name = str(js_names[index])
-
         action = js_names[index + 1].get_object()
 
         if action.get("/S") != "/JavaScript":
@@ -57,29 +66,14 @@ def extract_javascript(file_path: str) -> list[dict]:
         if code is None:
             continue
 
-        javascript.append({
-            "name": name,
-            "code": str(code),
-        })
+        javascript.append(
+            {
+                "name": name,
+                "code": str(code),
+            }
+        )
 
     return javascript
-
-
-SUSPICIOUS_PATTERNS = {
-    "eval": r"\beval\s*\(",
-
-    "function_constructor": r"\bFunction\s*\(",
-
-    "unescape": r"\bunescape\s*\(",
-
-    "decode_uri": r"\bdecodeURI(?:Component)?\s*\(",
-
-    "shell_execution": r"\b(?:app\.exec|util\.shell|shell)\b",
-
-    "document_write": r"\bdocument\.write\s*\(",
-
-    "external_url": r"https?://",
-}
 
 
 def analyze_javascript(code: str) -> dict:
@@ -90,7 +84,6 @@ def analyze_javascript(code: str) -> dict:
     findings = []
 
     for indicator, pattern in SUSPICIOUS_PATTERNS.items():
-
         if re.search(pattern, code, re.IGNORECASE):
             findings.append(indicator)
 
@@ -102,24 +95,24 @@ def analyze_javascript(code: str) -> dict:
 
 def analyze_embedded_javascript(file_path: str) -> list[dict]:
     """
-    Extract and statically analyze embedded JavaScript.
+    Extract and statically analyze embedded PDF JavaScript.
 
     JavaScript is never executed.
     """
 
     scripts = extract_javascript(file_path)
-
     results = []
 
     for script in scripts:
-
         analysis = analyze_javascript(script["code"])
 
-        results.append({
-            "name": script["name"],
-            "code": script["code"],
-            "suspicious": analysis["suspicious"],
-            "findings": analysis["findings"],
-        })
+        results.append(
+            {
+                "name": script["name"],
+                "code": script["code"],
+                "suspicious": analysis["suspicious"],
+                "findings": analysis["findings"],
+            }
+        )
 
     return results

@@ -51,7 +51,7 @@ def classify_embedded_file(file_info: dict) -> str:
 
 def extract_embedded_files(
     file_path: str,
-    output_directory: str
+    output_directory: str,
 ) -> list[dict]:
     """
     Extract embedded files from a PDF without executing them.
@@ -95,7 +95,6 @@ def extract_embedded_files(
     # [filename, file specification, filename, file specification, ...]
 
     for index in range(0, len(file_names), 2):
-
         if index + 1 >= len(file_names):
             break
 
@@ -127,10 +126,10 @@ def extract_embedded_files(
         with destination.open("wb") as output_file:
             output_file.write(file_data)
 
-        # Use the existing file identification system.
+        # Identify the extracted file.
         file_info = identify_file(str(destination))
 
-        # Classify the extracted file.
+        # Add preliminary classification.
         file_info["classification"] = classify_embedded_file(file_info)
 
         extracted_files.append(file_info)
