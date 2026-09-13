@@ -6,5 +6,8 @@ __pycache__/
 .env
 .env.*
 samples/extracted/
-samples/test_downloads/extracted/
+samples/test_downloads/*
+!samples/test_downloads/.gitkeep
 *.tmp
+trash/*
+!trash/.gitkeep
