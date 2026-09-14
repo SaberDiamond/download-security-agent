@@ -1,13 +1,29 @@
+from pathlib import Path
+
 from source.processor import process_file
 
 
-TEST_FILE = "samples/test_downloads/test_js.pdf"
+TEST_FILES = [
+    (
+        "samples/test_downloads/test_benign.pdf",
+        "LOW",
+    ),
+    (
+        "samples/test_downloads/test_js.pdf",
+        "HIGH",
+    ),
+    (
+        "samples/test_downloads/test_embedded_exe.pdf",
+        "HIGH",
+    ),
+]
 
 
-def validate_result(result: dict):
+def validate_result(
+    result: dict,
+):
     """
-    Validate the structure expected by the terminal interface
-    and future GUI.
+    Validate the common structure returned by process_file().
     """
 
     assert "file" in result
@@ -31,6 +47,7 @@ def validate_result(result: dict):
     assert result["status"] == "analyzed"
 
     assert result["risk"] is not None
+
     assert "score" in result["risk"]
     assert "level" in result["risk"]
     assert "findings" in result["risk"]
@@ -41,86 +58,93 @@ def validate_result(result: dict):
     assert result["action"] is None
 
 
-def analyze_file(file_path: str) -> dict:
-    return process_file(file_path)
+def test_file(
+    file_path: str,
+    expected_level: str,
+):
+    """
+    Process one sample PDF and validate its result.
+    """
 
+    assert Path(file_path).exists(), (
+        f"Test file does not exist: {file_path}"
+    )
 
-if __name__ == "__main__":
-    result = analyze_file(TEST_FILE)
+    result = process_file(
+        file_path
+    )
 
     validate_result(result)
 
-    print("Pipeline Test")
-    print("=========================")
+    actual_level = result["risk"]["level"]
 
-    print(f"File: {result['file']['name']}")
-    print(f"Type: {result['file']['type']}")
-    print(f"MIME Type: {result['file']['mime_type']}")
-    print(f"Size: {result['file']['size']} bytes")
-    print(f"SHA-256: {result['file']['sha256']}")
+    assert actual_level == expected_level, (
+        f"{file_path}: expected "
+        f"{expected_level}, got "
+        f"{actual_level}"
+    )
+
+    return result
+
+
+def main():
+    print(
+        "Download Security Agent"
+    )
+
+    print(
+        "Pipeline Test"
+    )
+
+    print(
+        "========================="
+    )
+
+    for file_path, expected_level in TEST_FILES:
+        result = test_file(
+            file_path,
+            expected_level,
+        )
+
+        print()
+        print(
+            f"File: "
+            f"{result['file']['name']}"
+        )
+
+        print(
+            f"Type: "
+            f"{result['file']['type']}"
+        )
+
+        print(
+            f"Risk: "
+            f"{result['risk']['level']}"
+        )
+
+        print(
+            f"Score: "
+            f"{result['risk']['score']}"
+        )
+
+        print(
+            f"Expected: "
+            f"{expected_level}"
+        )
+
+        print(
+            "Result: PASS"
+        )
 
     print()
-    print("Status")
-    print("-------------------------")
-    print(result["status"])
-
-    print()
-    print("Analysis")
-    print("-------------------------")
-
-    analysis = result["analysis"]
-
     print(
-        f"Pages: "
-        f"{analysis['pages']}"
+        "========================="
     )
 
     print(
-        f"JavaScript: "
-        f"{analysis['javascript_detected']}"
+        "All pipeline tests passed."
     )
 
-    print(
-        f"URLs: "
-        f"{analysis['urls']}"
-    )
 
-    print(
-        f"Embedded Files: "
-        f"{analysis['embedded_files_detected']}"
-    )
-
-    print(
-        f"Actions: "
-        f"{analysis['actions_detected']}"
-    )
-
-    print()
-    print("Risk Assessment")
-    print("-------------------------")
-
-    print(
-        f"Score: "
-        f"{result['risk']['score']}"
-    )
-
-    print(
-        f"Level: "
-        f"{result['risk']['level']}"
-    )
-
-    print()
-    print("Findings")
-
-    for finding in result["risk"]["findings"]:
-        print(f"- {finding}")
-
-    print()
-    print("Available Actions")
-    print("-------------------------")
-
-    for action in result["available_actions"]:
-        print(f"- {action}")
-
-    print()
-    print("Pipeline test passed.")
+if __name__ == "__main__":
+    main()

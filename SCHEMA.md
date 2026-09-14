@@ -41,7 +41,7 @@ The `file` object contains basic information about the analyzed file.
     "extension": ".pdf",
     "mime_type": "application/pdf",
     "size": 12345,
-    "sha256": "..."
+    "sha256": "...",
     "type": "PDF"
   }
 }

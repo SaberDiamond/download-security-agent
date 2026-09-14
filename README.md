@@ -1,74 +1,70 @@
 # Download Security Agent
 
-A lightweight endpoint security tool that analyzes downloaded files before they are opened, identifies suspicious characteristics, and produces a risk assessment to help users decide whether to keep or move a file to trash.
+A small cybersecurity project I built while exploring endpoint security and learning more about how security tools are built.
 
-## Project Background
+The idea was simple:
 
-Downloaded files can contain security risks that are not immediately visible to a user. A PDF, for example, can contain JavaScript, embedded files, external URLs, or actions that may be abused for malicious purposes.
+> What if a downloaded file could be checked for suspicious characteristics before a user opens it?
 
-The Download Security Agent is designed to inspect downloaded files and provide the user with security-focused information before they decide what to do with the file.
-
-The project was originally developed as a cybersecurity internship project and is now being continued as an independent portfolio project.
+I wanted to take that idea and turn it into a working MVP rather than just leave it as a concept.
 
 ---
 
-## Current MVP
+## What Does It Do?
 
-The current MVP focuses on **PDF files**.
+The Download Security Agent monitors a folder for newly downloaded files and analyzes supported files for potentially suspicious characteristics.
 
-The agent:
+For this MVP, the project focuses on **PDF files**.
 
-1. Monitors a designated download directory.
-2. Detects newly created files.
-3. Places detected files into a processing queue.
-4. Identifies basic file information.
-5. Analyzes supported PDF files.
-6. Extracts security-relevant indicators.
-7. Analyzes URLs found inside PDFs.
-8. Performs domain and IP reputation checks.
-9. Calculates a risk score and risk level.
-10. Returns a structured analysis result.
-11. Provides file actions for the user to choose from.
+The agent can currently:
 
-The current file actions are:
+- Monitor a folder for new files
+- Analyze PDF files
+- Detect embedded JavaScript
+- Look for suspicious JavaScript indicators
+- Detect embedded files
+- Extract URLs from PDFs
+- Analyze domains and IP addresses
+- Perform WHOIS and DNS-related checks
+- Check DNSBL reputation when configured
+- Generate a preliminary risk score
+- Display the results in a desktop GUI
+- Let the user decide whether to keep or move a file to Trash
 
-* **Allow**: Keep the file in its current location.
-* **Move to Trash**: Move the file into the project's `trash/` directory.
-
-The agent does **not** automatically delete or move files based solely on the risk score.
+The agent does **not** automatically delete files based on the risk score.
 
 ---
 
 ## How It Works
 
+At a high level, the process looks like this:
+
 ```text
 Downloaded File
       |
       v
-File Monitor
+ File Monitor
       |
       v
-Processing Queue
+ Processing Queue
       |
       v
-File Identification
+ File Identification
       |
       v
-PDF Analysis
+   PDF Analysis
       |
       +------------------+
       |                  |
       v                  v
-JavaScript          Embedded Files
-Analysis             Analysis
-      |
-      +------------------+
+ JavaScript        Embedded Files
+  Analysis            Analysis
       |
       v
-URL Extraction
+ URL Extraction
       |
       v
-URL Analysis
+ URL / Domain Analysis
       |
       +------------------+
       |                  |
@@ -76,167 +72,107 @@ URL Analysis
     WHOIS               DNS
                          |
                          v
-                       DNSBL
+                        DNSBL
       |
       v
-URL Assessment
+ Risk Assessment
       |
       v
-Risk Engine
+   GUI Alert
       |
-      v
-Structured Result
-      |
-      +-------------------+
-      |                   |
-      v                   v
-   Terminal              GUI
-                         (future)
-```
+      +------------------+
+      |                  |
+      v                  v
+  Keep File        Move to Trash
+````
+
+The project uses a queue-based worker so that the agent can wait for new files instead of continuously scanning the directory.
 
 ---
 
-## Architecture
+## Example
 
-The project uses a modular architecture so that individual security checks can be developed and maintained independently.
-
-### Monitoring
-
-The file monitor uses `watchdog` to detect newly created files.
-
-Detected files are placed into a queue rather than being continuously scanned by a worker.
-
-The processing worker waits on the queue when there are no files to process. This avoids unnecessary continuous filesystem scanning and keeps idle CPU usage low.
-
-### File Identification
-
-Before analysis, the agent collects basic file information:
-
-* Filename
-* File extension
-* MIME type
-* File size
-* SHA-256 hash
-
-### PDF Analysis
-
-The current PDF analyzer checks for several security-relevant characteristics:
-
-* Encryption
-* Embedded JavaScript
-* External URLs
-* Embedded files
-* PDF actions
-
-### JavaScript Analysis
-
-Embedded JavaScript is inspected for suspicious indicators.
-
-The current implementation can identify indicators such as:
-
-* `eval`
-
-JavaScript findings contribute to the overall risk assessment.
-
-### URL Analysis
-
-URLs extracted from PDFs are analyzed separately.
-
-The URL analyzer collects:
-
-* URL
-* Scheme
-* Domain
-* Port
-* Path
-* Query
-* Fragment
-* Resolved IP addresses
-
-### WHOIS Analysis
-
-WHOIS information is used as reputation evidence.
-
-The current analysis includes:
-
-* Registrar
-* Domain creation date
-* Domain expiration date
-* Domain age
-
-A newly registered domain is treated as a potential warning indicator, not proof of malicious activity.
-
-### DNSBL Analysis
-
-Resolved IPv4 addresses can be checked against Spamhaus DNSBL infrastructure using Spamhaus DQS.
-
-A listed IP is treated as a significant reputation concern.
-
-A non-listed IP does not prove that the associated domain is safe.
-
-### URL Assessment
-
-The URL assessment layer combines multiple reputation indicators, including:
-
-* Domain age
-* Domain expiration
-* DNSBL results
-* HTTPS usage
-
-It produces a URL-level verdict such as:
-
-* `LOW_RISK`
-* `CAUTION`
-* `SUSPICIOUS`
-* `UNKNOWN`
-
-### Risk Engine
-
-The risk engine combines findings from the different analyzers into a single risk score.
-
-The current risk levels are:
-
-| Score | Level    |
-| ----: | -------- |
-|   0-1 | LOW      |
-|   2-4 | MEDIUM   |
-|   5-7 | HIGH     |
-|    8+ | CRITICAL |
-
-The risk engine evaluates evidence produced by the analyzers. It does not independently determine whether a file is malicious.
-
----
-
-## Structured Processing Result
-
-The processor produces a structured result that acts as the interface between the security backend and future user interfaces.
-
-The structure is approximately:
+For example, a PDF containing embedded JavaScript may produce a result such as:
 
 ```text
-result
-├── file
-│   ├── name
-│   ├── path
-│   ├── extension
-│   ├── mime_type
-│   ├── size
-│   ├── sha256
-│   └── type
-│
-├── status
-├── error
-├── analysis
-├── risk
-├── available_actions
-└── action
+Risk: HIGH
+Score: 5
+
+Findings:
+- JavaScript detected
+- Suspicious JavaScript detected
+- JavaScript indicator: eval
 ```
 
-This separation allows the security engine to remain independent from the user interface.
+The GUI then lets the user inspect the findings and decide what to do with the file.
 
-The terminal interface currently displays this result.
+---
 
-A future graphical interface can consume the same result without needing to understand or modify the underlying security analysis.
+## The GUI
+
+The MVP includes a simple desktop interface built with CustomTkinter.
+
+The main dashboard shows:
+
+* Whether protection is active
+* The directory currently being monitored
+* A button to manually scan a file
+* Recent activity
+
+When a file is analyzed, a security alert window shows:
+
+* Risk level
+* Risk score
+* Why the file was flagged
+* File information
+* PDF analysis
+* JavaScript analysis
+* URL and domain information
+* Other available analysis results
+
+The user can then choose:
+
+**Keep File**
+Leaves the file where it is.
+
+**Move to Trash**
+Moves the file into the project's `trash/` directory instead of permanently deleting it.
+
+---
+
+## Why I Built This
+
+I am interested in cybersecurity and wanted to get some hands-on experience building something rather than only learning about security concepts.
+
+This project started as an idea and gradually became a working MVP.
+
+While building it, I learned about things I had not worked with much before, including:
+
+* File-system monitoring
+* Queues and worker threads
+* URLs and domain information
+* DNS and DNSBLs
+* Desktop GUI development
+* Structuring a project into separate components
+
+The main goal was to learn by actually building something and making it modular for future expansion.
+
+---
+
+## Current MVP
+
+The current version supports:
+
+* **PDF files**
+* Directory monitoring
+* Manual file scanning
+* PDF security analysis
+* URL and domain analysis
+* Preliminary risk assessment
+* Desktop notifications
+* User-controlled file actions
+
+This is intentionally a small MVP rather than a complete endpoint security product.
 
 ---
 
@@ -269,8 +205,16 @@ download-security-agent/
 │   ├── actions/
 │   │   └── file_actions.py
 │   │
+│   ├── gui/
+│   │   ├── app.py
+│   │   ├── alert_window.py
+│   │   ├── widgets.py
+│   │   ├── formatters.py
+│   │   └── theme.py
+│   │
 │   ├── processor.py
-│   └── main.py
+│   ├── main.py
+│   └── gui_main.py
 │
 ├── tests/
 │   └── test_pipeline.py
@@ -278,274 +222,166 @@ download-security-agent/
 ├── samples/
 │   ├── generators/
 │   └── test_downloads/
+│   └── test_pdfs/
 │
 ├── trash/
-│   └── .gitkeep
 │
 ├── README.md
+├── SCHEMA.md
 ├── requirements.txt
 └── .gitignore
 ```
 
 ---
 
-## Requirements
+## Running the Project
 
-* Python 3.9+
-* `watchdog`
-* `pypdf`
-* `python-whois`
-
-Install dependencies with:
-
-```bash
-pip install -r requirements.txt
-```
-
----
-
-## Installation
-
-Clone the repository:
+### 1. Clone the repository
 
 ```bash
 git clone <repository-url>
 cd download-security-agent
 ```
 
-Create a virtual environment:
+### 2. Create a virtual environment
 
 ```bash
 python3 -m venv .venv
-```
-
-Activate it on macOS/Linux:
-
-```bash
 source .venv/bin/activate
 ```
 
-Install dependencies:
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
----
-
-## Running the Agent
-
-Start the agent with:
+### 4. Start the GUI
 
 ```bash
-python -m source.main
+python -m source.gui_main
 ```
 
-The agent will begin monitoring the configured download directory.
+The MVP currently monitors:
 
-When a new file is detected, it is placed into the processing queue and analyzed by the worker.
+```text
+samples/test_downloads
+```
+Test PDFs are provided in the 'samples/test_pdfs/' directory. 
 
----
+To test the monitoring functionality, copy one of the test PDFs into 'samples/test_downloads/' and the agent will detect and analyze it.
 
-## Testing
+Place a PDF into that folder to test the monitoring and analysis pipeline.
 
-The pipeline test can be run from the project root with:
+### 5. Run the tests
 
 ```bash
 python -m tests.test_pipeline
 ```
 
-The test validates the complete processing pipeline, including:
-
-* File identification
-* PDF analysis
-* JavaScript detection
-* Risk calculation
-* Structured result generation
-* Available user actions
-
-A successful test ends with:
-
-```text
-Pipeline test passed.
-```
-
 ---
 
-## DNSBL Configuration
+## DNSBL Checks
 
-DNSBL checks use Spamhaus DQS.
+For the DNSBL checks, this project uses **Spamhaus DQS (Data Query Service)**.
 
-The DQS key is read from the following environment variable:
+Since this is a personal project, the DNSBL implementation only makes a minimal number of DQS queries for testing purposes.
 
-```text
-SPAMHAUS_DQS_KEY
-```
+To use the DNSBL checks:
 
-Set the variable before running the agent:
+1. Go to [Spamhaus](https://www.spamhaus.com/) and sign up for a DQS account.
+2. After signing up, get your **DQS Query Key**.
+3. Copy the key and run the following command in your terminal before starting the project:
 
 ```bash
 export SPAMHAUS_DQS_KEY="your-key-here"
 ```
 
-The key should never be committed to the repository.
+The key should not be committed to the repository.
 
-If the key is not configured, DNSBL analysis reports that the check could not be performed rather than treating the IP as safe.
-
----
-
-## File Actions
-
-The project currently provides two file actions.
-
-### Allow
-
-Allowing a file leaves it in its current location.
-
-No filesystem operation is performed.
-
-### Move to Trash
-
-The agent can move a file into:
-
-```text
-trash/
-```
-
-The project does not permanently delete the file.
-
-Filename collisions are handled automatically:
-
-```text
-suspicious.pdf
-suspicious_1.pdf
-suspicious_2.pdf
-```
-
-This provides a safer recovery path than immediately deleting a potentially suspicious file.
+DNSBL checks are optional. If a key is not configured, the agent does not treat that as proof that an IP is safe.
 
 ---
 
 ## Current Limitations
 
-The current MVP has several intentional limitations.
+There are still several things I would like to improve and implement.
 
 ### PDF Only
 
-PDF is currently the only supported file type.
+The current MVP only supports PDF files.
 
-The architecture is designed so additional analyzers can be added later without rewriting the monitoring and processing pipeline.
+Additional file types could be added later.
 
-Potential future file types include:
+### Post-Download Analysis
 
-* Office documents
-* Images
-* Archives
-* Executables
-* Scripts
+The current version analyzes files after they appear in the monitored folder.
 
-### Post-Download Monitoring
+It does not intercept a download before it reaches the filesystem.
 
-The current implementation detects files after they appear in the monitored directory.
+### Preliminary Risk Assessment
 
-It does not intercept a network download before the file reaches the filesystem.
+The risk score is based on the indicators currently implemented in the project.
 
-A future implementation could use an isolated browser download directory or another interception mechanism to provide earlier inspection.
+It should not be treated as a definitive determination that a file is malicious or safe.
 
-### URL Reputation
+### No Sandbox
 
-URL assessment currently relies on available domain, DNS, DNSBL, and HTTPS indicators.
-
-These signals provide evidence but cannot guarantee that a URL is malicious or safe.
-
-### No Sandbox Execution
-
-The current MVP does not execute suspicious files in a virtual machine or sandbox.
-
-A future version could analyze suspicious URLs or files in an isolated environment.
+The current MVP does not execute files or URLs inside a virtual machine or sandbox.
 
 ### No Automatic Blocking
 
-The agent does not automatically delete or quarantine files based on their risk level.
+The agent does not automatically delete or quarantine a file because of its risk score.
 
-The current design keeps the final decision with the user.
-
-### Graphical Interface
-
-The security backend currently produces structured results and terminal output.
-
-A graphical interface is the next major user-facing component.
+The user makes the final decision.
 
 ---
 
-## Future Development
+## What I'd Like to Work On Next
 
-Potential future improvements include:
+Now that the basic MVP is working, some areas I'd like to explore are:
 
-### Graphical User Interface
+* More reliable file-type identification
+* Support for additional file types
+* Better handling of files while they are still downloading
+* More security analysis techniques
+* Better testing
+* Potential sandbox-based analysis
 
-A GUI will present analysis results in an easier-to-understand format.
-
-Possible sections include:
-
-* Risk level
-* Risk score
-* File information
-* Why the file was flagged
-* PDF analysis
-* JavaScript analysis
-* URL analysis
-* Domain reputation
-* Embedded file information
-* Available actions
-
-Users will be able to expand sections to inspect the evidence behind the risk assessment.
-
-### Additional File Types
-
-Additional analyzers can be added as independent modules.
-
-The modular architecture is intended to make this possible without rewriting the core monitoring and processing system.
-
-### Stronger URL Reputation
-
-Future versions could incorporate additional reputation sources and signals.
-
-### Isolated Analysis
-
-Suspicious URLs or files could eventually be inspected in an isolated virtual machine or sandbox.
-
-### Earlier Download Inspection
-
-A future architecture could inspect files before they are made available to the user, potentially through an isolated download location or download interception mechanism.
-
-### Improved Risk Scoring
-
-The risk engine could eventually use more granular evidence and confidence levels rather than relying only on fixed weights.
+These are future improvements rather than requirements for the current MVP.
 
 ---
 
-## Security Philosophy
+## Where Could This Be Implemented?
 
-The project follows an **evidence-based analysis** approach.
+I initially imagined this as a program running directly on personal devices. However, after discussing the idea with a mentor, I realized that the same concept could potentially be implemented at an organizational level, such as a SaaS solution or an internal security service for employers.
 
-Individual indicators are not automatically treated as proof of malicious activity.
+For example, with the sandboxing approach I would like to explore in the future, downloaded files could first be sent to dedicated company servers for analysis in an isolated environment before being made available to the user.
 
-For example:
-
-* HTTPS does not mean a website is safe.
-* A young domain is not automatically malicious.
-* An IP not appearing in a DNSBL does not prove that it is safe.
-* A PDF containing JavaScript is suspicious, but the presence of JavaScript alone does not establish malicious intent.
-
-The goal is to combine multiple signals and present the evidence clearly so that a user can make an informed decision.
+I understand that this approach could introduce some additional delay to the downloading process, even when a file is determined to be safe. One possible solution would be to give users the option to bypass the additional analysis when they trust the source or file.
 
 ---
 
-## Disclaimer
+## What I Learned
 
-This project is an educational and portfolio project.
+One of the biggest things I learned from this project is that building a tool involves much more than just writing the main functionality.
 
-It should not be considered a replacement for enterprise endpoint security, malware detection, sandboxing, antivirus software, or professional security analysis.
+When I first started this project, I mainly focused on the idea of analyzing downloaded files for suspicious characteristics. As I built it, I realized how many other pieces were involved in turning that idea into an actual working application.
 
-The analysis results are indicators and should not be interpreted as definitive proof that a file or URL is safe or malicious.
+I had to think about:
+
+- How files are detected
+- How work is queued and processed
+- How different components communicate with each other
+- How the analysis results are combined
+- How results should be presented to the user
+- How user actions should be handled
+- What technologies and libraries are appropriate for each part of the application
+- How the overall architecture should be structured
+- How different parts of the application fit together
+
+This project made me realize that there is a lot more to learn about software development, including different tech stacks, system architecture, and how larger applications are designed.
+
+It also gave me a better understanding of what it means to take a cybersecurity idea and turn it into a working application rather than just implementing one individual security feature.
+
+Building this MVP gave me a much better understanding of what goes into turning an idea into a working application, and it also helped me identify the areas of software development and cybersecurity that I want to learn more about next.
