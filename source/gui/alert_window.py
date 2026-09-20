@@ -1229,11 +1229,15 @@ class AlertWindow(ctk.CTkToplevel):
             or {}
         )
 
+        status_title = (
+            "File Type Mismatch"
+            if status == "type_mismatch"
+            else fmt_mod.status_title(status)
+        )
+
         ctk.CTkLabel(
             container,
-            text=fmt_mod.status_title(
-                status
-            ),
+            text=status_title,
             text_color=theme.TEXT_PRIMARY,
             font=theme.FONT_PAGE_TITLE,
             anchor="w",
@@ -1257,6 +1261,10 @@ class AlertWindow(ctk.CTkToplevel):
         )
 
         messages = {
+            "type_mismatch": (
+                "The file extension does not match the "
+                "actual file type detected."
+            ),
             "unsupported": (
                 "This version currently supports "
                 "PDF files. This file was not analyzed."
@@ -1290,6 +1298,22 @@ class AlertWindow(ctk.CTkToplevel):
             fill="x",
             pady=(0, 18),
         )
+
+        if status == "type_mismatch":
+            actual_type = file_info.get(
+                "actual_type"
+            ) or "Unknown"
+
+            ctk.CTkLabel(
+                container,
+                text=f"Detected file type: {actual_type}",
+                text_color=theme.TEXT_PRIMARY,
+                font=theme.FONT_BODY_BOLD,
+                anchor="w",
+            ).pack(
+                fill="x",
+                pady=(0, 18),
+            )
 
         error = self.result.get(
             "error"

@@ -1,19 +1,20 @@
 from pathlib import Path
 
 from source.processor import process_file
+from source.identification.file_identifier import identify_file
 
 
 TEST_FILES = [
     (
-        "samples/test_downloads/test_benign.pdf",
+        "samples/test_pdfs/test_benign.pdf",
         "LOW",
     ),
     (
-        "samples/test_downloads/test_js.pdf",
+        "samples/test_pdfs/test_js.pdf",
         "HIGH",
     ),
     (
-        "samples/test_downloads/test_embedded_exe.pdf",
+        "samples/test_pdfs/test_embedded_exe.pdf",
         "HIGH",
     ),
 ]
@@ -58,7 +59,7 @@ def validate_result(
     assert result["action"] is None
 
 
-def test_file(
+def run_test(
     file_path: str,
     expected_level: str,
 ):
@@ -87,6 +88,57 @@ def test_file(
     return result
 
 
+def test_pipeline_files():
+    """
+    Run all sample files through the complete security pipeline.
+    """
+
+    for file_path, expected_level in TEST_FILES:
+        run_test(
+            file_path,
+            expected_level,
+        )
+
+
+def test_pdf_file_type_is_verified():
+    """
+    Verify that the benign sample is actually a PDF
+    based on its binary signature.
+    """
+
+    file_path = (
+        "samples/test_pdfs/test_benign.pdf"
+    )
+
+    result = identify_file(file_path)
+
+    assert result["extension"] == ".pdf"
+    assert result["actual_type"] == "PDF"
+    assert result["type_verified"] is True
+
+
+def test_file_type_mismatch_is_detected(tmp_path):
+    """
+    Verify that a file pretending to be a PDF is detected
+    as a file-type mismatch.
+    """
+
+    fake_pdf = tmp_path / "fake.pdf"
+
+    fake_pdf.write_text(
+        "This is not actually a PDF file.",
+        encoding="utf-8",
+    )
+
+    result = identify_file(
+        str(fake_pdf)
+    )
+
+    assert result["extension"] == ".pdf"
+    assert result["actual_type"] == "Unknown"
+    assert result["type_verified"] is False
+
+
 def main():
     print(
         "Download Security Agent"
@@ -101,7 +153,7 @@ def main():
     )
 
     for file_path, expected_level in TEST_FILES:
-        result = test_file(
+        result = run_test(
             file_path,
             expected_level,
         )

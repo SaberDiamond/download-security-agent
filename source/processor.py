@@ -20,8 +20,8 @@ def process_file(file_path: str) -> dict:
     Analyze a downloaded file and return one complete structured result.
 
     The returned object is the contract used by the terminal interface
-    and the future GUI. File identification, analysis, and risk
-    assessment are all represented in the same result.
+    and the GUI. File identification, analysis, and risk assessment are
+    all represented in the same result.
 
     No user action is performed automatically.
     """
@@ -34,6 +34,7 @@ def process_file(file_path: str) -> dict:
             "path": str(path),
             "extension": path.suffix.lower(),
             "mime_type": "unknown",
+            "actual_type": None,
             "size": None,
             "sha256": None,
             "type": None,
@@ -63,24 +64,39 @@ def process_file(file_path: str) -> dict:
             "name": file_info["filename"],
             "extension": file_info["extension"],
             "mime_type": file_info["mime_type"],
+            "actual_type": file_info["actual_type"],
             "size": file_info["size"],
             "sha256": file_info["sha256"],
         }
     )
 
     # --------------------------------------------------
-    # Step 2: Check whether the file type is supported
+    # Step 2: Verify the actual file type
+    # --------------------------------------------------
+
+    if not file_info["type_verified"]:
+        result["file"]["type"] = file_info["actual_type"]
+        result["status"] = "type_mismatch"
+        result["error"] = (
+            "File extension does not match the detected file type."
+        )
+        result["available_actions"] = AVAILABLE_ACTIONS.copy()
+        return result
+
+    # --------------------------------------------------
+    # Step 3: Check whether the file type is supported
     # --------------------------------------------------
 
     if file_info["extension"] not in SUPPORTED_TYPES:
+        result["file"]["type"] = file_info["actual_type"]
         result["status"] = "unsupported"
         result["available_actions"] = AVAILABLE_ACTIONS.copy()
         return result
 
-    result["file"]["type"] = "PDF"
+    result["file"]["type"] = file_info["actual_type"]
 
     # --------------------------------------------------
-    # Step 3: Analyze the file
+    # Step 4: Analyze the file
     # --------------------------------------------------
 
     try:
@@ -95,7 +111,7 @@ def process_file(file_path: str) -> dict:
     result["analysis"] = analysis
 
     # --------------------------------------------------
-    # Step 4: Calculate risk
+    # Step 5: Calculate risk
     # --------------------------------------------------
 
     try:
@@ -113,7 +129,7 @@ def process_file(file_path: str) -> dict:
         return result
 
     # --------------------------------------------------
-    # Step 5: Store final result
+    # Step 6: Store final result
     # --------------------------------------------------
 
     result["status"] = "analyzed"
@@ -144,6 +160,9 @@ def print_result(result: dict) -> None:
     print(f"Extension: {file_info['extension']}")
     print(f"MIME Type: {file_info['mime_type']}")
 
+    if file_info["actual_type"]:
+        print(f"Actual Type: {file_info['actual_type']}")
+
     if file_info["size"] is not None:
         print(f"Size: {file_info['size']} bytes")
 
@@ -159,6 +178,12 @@ def print_result(result: dict) -> None:
 
     if result["status"] == "identification_failed":
         print("Status: File identification failed")
+        print(f"Error: {result['error']}")
+        print("================================")
+        return
+
+    if result["status"] == "type_mismatch":
+        print("Status: File type mismatch")
         print(f"Error: {result['error']}")
         print("================================")
         return
